@@ -20,15 +20,20 @@ const App: React.FC = () => {
   const [polls, setPolls] = useState<Poll[]>(MOCK_POLLS);
   const [announcements, setAnnouncements] = useState<Announcement[]>(MOCK_ANNOUNCEMENTS);
   const [tasks, setTasks] = useState<OperationalTask[]>(MOCK_TASKS);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem('condo_theme') === 'dark';
+  });
 
-  // Persistence simulation
   useEffect(() => {
     const savedUser = localStorage.getItem('condo_user');
     if (savedUser) {
-      const parsed = JSON.parse(savedUser);
-      setCurrentUser(parsed);
+      setCurrentUser(JSON.parse(savedUser));
     }
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('condo_theme', isDarkMode ? 'dark' : 'light');
+  }, [isDarkMode]);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -41,8 +46,14 @@ const App: React.FC = () => {
     setActiveTab('dashboard');
   };
 
+  const toggleTheme = () => setIsDarkMode(!isDarkMode);
+
   if (!currentUser) {
-    return <Login onLogin={handleLogin} users={users} />;
+    return (
+      <div className={isDarkMode ? 'dark' : ''}>
+        <Login onLogin={handleLogin} users={users} />
+      </div>
+    );
   }
 
   const renderContent = () => {
@@ -58,15 +69,22 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-slate-50">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} user={currentUser} onLogout={handleLogout} />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Navbar user={currentUser} notifications={notifications.filter(n => n.unitId === currentUser.unit || currentUser.role !== UserRole.MORADOR)} />
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="max-w-6xl mx-auto">
-            {renderContent()}
-          </div>
-        </main>
+    <div className={`${isDarkMode ? 'dark' : ''}`}>
+      <div className="min-h-screen flex flex-col md:flex-row bg-neutral-surface dark:bg-brand-1 transition-colors duration-300">
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} user={currentUser} onLogout={handleLogout} />
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <Navbar 
+            user={currentUser} 
+            isDarkMode={isDarkMode}
+            toggleTheme={toggleTheme}
+            notifications={notifications.filter(n => n.unitId === currentUser.unit || currentUser.role !== UserRole.MORADOR)} 
+          />
+          <main className="flex-1 overflow-y-auto p-4 md:p-8">
+            <div className="max-w-6xl mx-auto">
+              {renderContent()}
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   );

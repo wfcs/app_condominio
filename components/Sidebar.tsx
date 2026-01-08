@@ -28,7 +28,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
           <div className="bg-brand-3 p-2 rounded-lg">
             <i className="fa-solid fa-building text-xl text-brand-1"></i>
           </div>
-          <span className="text-xl font-bold tracking-tight">CondoLink</span>
+          <span className="text-xl font-bold tracking-tight">CondoConnect</span>
         </div>
       </div>
 
