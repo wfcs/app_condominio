@@ -1,5 +1,5 @@
 {
   "name": "CondoConnect - Gestão Condominial Inteligente",
-  "description": "Plataforma completa para gestão de condomínios, focada em comunicação privada, governança, segurança e operações diárias, totalmente em Português (pt-BR).",
+  "description": "Plataforma completa para gestão de condomínios conectada ao Supabase Cloud, focada em comunicação privada e governança.",
   "requestFramePermissions": []
 }

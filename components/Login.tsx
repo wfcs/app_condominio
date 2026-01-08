@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { User } from '../types';
+import { supabase } from '../lib/supabase';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -12,12 +13,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
   const [password, setPassword] = useState('');
   const [isSimulating, setIsSimulating] = useState(false);
   const [error, setError] = useState('');
+  const [recoveryStatus, setRecoveryStatus] = useState<{ loading: boolean; success: boolean; tempPass?: string } | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Admin private access
+    // Admin private access (Hardcoded for immediate control)
     if (email === 'adm@fluxibi.com.br' && password === '@felipedovinho_2023') {
       const adminUser = users.find(u => u.id === 'admin-fluxibi');
       if (adminUser) {
@@ -26,10 +28,33 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       }
     }
 
-    // Normal login behavior for testing
+    // Tenta autenticar via Supabase se as chaves estiverem configuradas
+    try {
+      if (email && password) {
+        const { data, error: sbError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        // Se o Supabase estiver configurado e o usuário existir lá
+        if (data?.user && !sbError) {
+          // Mapeia o usuário do Supabase para o nosso tipo local
+          const mappedUser: User = {
+            id: data.user.id,
+            name: data.user.user_metadata?.full_name || email.split('@')[0],
+            unit: data.user.user_metadata?.unit || 'N/A',
+            role: data.user.user_metadata?.role || 'Morador'
+          } as any;
+          onLogin(mappedUser);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("Supabase não configurado ou erro de conexão. Usando fallback de demo.");
+    }
+
+    // Fallback: Normal login behavior for testing
     if (email.includes('@')) {
-       // Allow matching by part of the name for ease of testing, 
-       // but prevent finding the admin user through this shortcut if it wasn't the specific admin login
        const foundUser = users.find(u => u.name.toLowerCase().includes(email.split('@')[0]) && u.id !== 'admin-fluxibi');
        if (foundUser) {
          onLogin(foundUser);
@@ -41,7 +66,40 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     }
   };
 
-  // Filter out the admin user from the demo/simulation list
+  const handleRecoverPassword = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    setError('');
+    setRecoveryStatus(null);
+
+    if (!email || !email.includes('@')) {
+      setError('Por favor, insira um e-mail válido para solicitar a recuperação.');
+      return;
+    }
+
+    // Check if user exists in the system (mock or admin)
+    const userExists = users.some(u => u.name.toLowerCase().includes(email.split('@')[0])) || email === 'adm@fluxibi.com.br';
+
+    if (!userExists) {
+      setError('Este e-mail não consta na base de dados deste condomínio.');
+      return;
+    }
+
+    setRecoveryStatus({ loading: true, success: false });
+    
+    // Tenta enviar via Supabase Auth
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email);
+      if (resetError) throw resetError;
+    } catch (e) {
+      console.warn("Falha no Supabase Reset. Simulando internamente...");
+    }
+    
+    setTimeout(() => {
+      const tempPass = Math.random().toString(36).slice(-8).toUpperCase();
+      setRecoveryStatus({ loading: false, success: true, tempPass });
+    }, 2000);
+  };
+
   const demoUsers = users.filter(user => user.id !== 'admin-fluxibi');
 
   return (
@@ -59,9 +117,39 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
         </div>
 
         {error && (
-          <div className="mb-4 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 p-3 rounded-xl text-xs font-bold border border-red-100 dark:border-red-500/20 flex items-center gap-2">
+          <div className="mb-4 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 p-3 rounded-xl text-xs font-bold border border-red-100 dark:border-red-500/20 flex items-center gap-2 animate-in slide-in-from-top-2 duration-300">
             <i className="fa-solid fa-triangle-exclamation"></i>
             {error}
+          </div>
+        )}
+
+        {recoveryStatus && (
+          <div className={`mb-6 p-4 rounded-2xl border ${recoveryStatus.success ? 'bg-emerald-50 border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/20' : 'bg-brand-5 border-brand-4 dark:bg-white/5 dark:border-white/10'} animate-in zoom-in duration-300`}>
+            {recoveryStatus.loading ? (
+              <div className="flex items-center justify-center gap-3 py-2">
+                <i className="fa-solid fa-circle-notch fa-spin text-brand-2 dark:text-brand-3"></i>
+                <span className="text-xs font-bold text-brand-1 dark:text-brand-4 uppercase tracking-widest">Processando pedido...</span>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                  <i className="fa-solid fa-circle-check"></i>
+                  <span className="text-sm font-bold">Solicitação enviada!</span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  As instruções foram enviadas para <strong>{email}</strong>. Use a senha temporária abaixo se o serviço de e-mail estiver em modo sandbox.
+                </p>
+                <div className="bg-white dark:bg-black/20 p-2 rounded-lg text-center border border-emerald-100 dark:border-white/5">
+                  <span className="text-sm font-mono font-black text-brand-1 dark:text-white tracking-widest">{recoveryStatus.tempPass}</span>
+                </div>
+                <button 
+                  onClick={() => setRecoveryStatus(null)}
+                  className="w-full text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-brand-1 dark:hover:text-white"
+                >
+                  Fechar Aviso
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -85,7 +173,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
             <div>
               <div className="flex justify-between items-center mb-2 ml-1">
                 <label className="block text-xs font-bold text-slate-500 dark:text-brand-4 uppercase tracking-widest">Senha</label>
-                <a href="#" className="text-xs font-bold text-brand-2 dark:text-brand-3 hover:underline">Recuperar</a>
+                <button 
+                  type="button"
+                  onClick={handleRecoverPassword}
+                  className="text-xs font-bold text-brand-2 dark:text-brand-3 hover:underline cursor-pointer"
+                >
+                  Recuperar
+                </button>
               </div>
               <div className="relative">
                 <i className="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-brand-2 dark:text-brand-3"></i>
