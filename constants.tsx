@@ -32,7 +32,10 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     content: 'Convocamos todos os moradores para a assembleia no dia 15/11 no salão de festas.',
     category: 'Assembleia',
     author: 'Síndico',
-    date: new Date()
+    authorId: 'admin-fluxibi',
+    date: new Date(),
+    likes: [],
+    comments: []
   },
   {
     id: 'a2',
@@ -40,7 +43,10 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     content: 'Estou vendendo minha bike semi-nova. Interessados tratar no apt 304.',
     category: 'Brechó',
     author: 'Morador Apt 304',
-    date: new Date()
+    authorId: '1',
+    date: new Date(),
+    likes: [],
+    comments: []
   }
 ];
 

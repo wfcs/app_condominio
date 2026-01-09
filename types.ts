@@ -9,7 +9,7 @@ export enum UserRole {
 export interface User {
   id: string;
   name: string;
-  unit: string; // e.g., "Apt 101"
+  unit: string;
   role: UserRole;
 }
 
@@ -28,9 +28,16 @@ export interface Poll {
   title: string;
   description: string;
   options: { id: string; text: string; votes: number }[];
-  votedUnits: string[]; // List of unit IDs that already voted
+  votedUnits: string[];
   endDate: Date;
   active: boolean;
+}
+
+export interface Comment {
+  id: string;
+  author: string;
+  content: string;
+  date: Date;
 }
 
 export interface Announcement {
@@ -39,7 +46,10 @@ export interface Announcement {
   content: string;
   category: 'Assembleia' | 'Comunicado' | 'Evento' | 'Brechó' | 'Social';
   author: string;
+  authorId: string;
   date: Date;
+  likes: string[]; // Array of User IDs
+  comments: Comment[];
   attachments?: string[];
 }
 
