@@ -58,13 +58,13 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard': return <Dashboard user={currentUser} polls={polls} announcements={announcements} tasks={tasks} notifications={notifications} />;
+      case 'dashboard': return <Dashboard user={currentUser} polls={polls} announcements={announcements} tasks={tasks} notifications={notifications} onNavigate={setActiveTab} />;
       case 'gatehouse': return <GatehouseView user={currentUser} onSendNotification={(n) => setNotifications([n, ...notifications])} />;
       case 'polls': return <PollsView user={currentUser} polls={polls} setPolls={setPolls} />;
       case 'board': return <BoardView user={currentUser} announcements={announcements} setAnnouncements={setAnnouncements} />;
       case 'operational': return <OperationalView user={currentUser} tasks={tasks} setTasks={setTasks} />;
       case 'management': return <ManagementView users={users} setUsers={setUsers} />;
-      default: return <Dashboard user={currentUser} polls={polls} announcements={announcements} tasks={tasks} notifications={notifications} />;
+      default: return <Dashboard user={currentUser} polls={polls} announcements={announcements} tasks={tasks} notifications={notifications} onNavigate={setActiveTab} />;
     }
   };
 
