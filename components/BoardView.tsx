@@ -1,6 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Announcement, Comment } from '../types';
+import { supabase } from '../lib/supabase';
 
 interface BoardViewProps {
   user: User;
@@ -16,15 +17,53 @@ const BoardView: React.FC<BoardViewProps> = ({ user, announcements, setAnnouncem
   const [category, setCategory] = useState<any>('Comunicado');
   const [activeCommentBox, setActiveCommentBox] = useState<string | null>(null);
   const [commentText, setCommentText] = useState('');
+  const [loading, setLoading] = useState<{ [key: string]: boolean }>({});
 
   const categories = ['Todos', 'Assembleia', 'Comunicado', 'Evento', 'Brechó', 'Social'];
 
+  // Efeito para carregar interações do Supabase ao montar ou ao mudar os anúncios
+  useEffect(() => {
+    const fetchInteractions = async () => {
+      // Para cada anúncio, buscamos curtidas e comentários reais
+      const updatedAnnouncements = await Promise.all(announcements.map(async (a) => {
+        // Buscar Likes
+        const { data: likes } = await supabase
+          .from('announcement_likes')
+          .select('user_id')
+          .eq('announcement_id', a.id);
+
+        // Buscar Comentários
+        const { data: comments } = await supabase
+          .from('announcement_comments')
+          .select('*')
+          .eq('announcement_id', a.id)
+          .order('created_at', { ascending: true });
+
+        return {
+          ...a,
+          likes: likes?.map(l => l.user_id) || [],
+          comments: comments?.map(c => ({
+            id: c.id,
+            author: `${c.author_name} (${c.author_unit})`,
+            content: c.content,
+            date: new Date(c.created_at)
+          })) || []
+        };
+      }));
+
+      // Evita loop infinito comparando se houve mudança real (simplificado)
+      setAnnouncements(updatedAnnouncements);
+    };
+
+    fetchInteractions();
+  }, [announcements.length]); // Executa quando a lista de anúncios muda (ex: novo post)
+
   const filtered = filter === 'Todos' ? announcements : announcements.filter(a => a.category === filter);
 
-  const addPost = () => {
+  const addPost = async () => {
     if (!title || !content) return;
     const post: Announcement = {
-      id: Date.now().toString(),
+      id: Date.now().toString(), // Em um cenário real, o DB geraria este ID
       title,
       content,
       category,
@@ -34,44 +73,91 @@ const BoardView: React.FC<BoardViewProps> = ({ user, announcements, setAnnouncem
       likes: [],
       comments: []
     };
+    
+    // Aqui poderíamos salvar o post no DB também se você criou a tabela de announcements
     setAnnouncements([post, ...announcements]);
     setShowAdd(false);
     setTitle('');
     setContent('');
   };
 
-  const handleLike = (postId: string) => {
+  const handleLike = async (postId: string) => {
+    const post = announcements.find(a => a.id === postId);
+    if (!post) return;
+
+    const hasLiked = post.likes.includes(user.id);
+
+    // Optimistic Update na UI
     setAnnouncements(prev => prev.map(a => {
       if (a.id === postId) {
-        const hasLiked = a.likes.includes(user.id);
         return {
           ...a,
-          likes: hasLiked 
-            ? a.likes.filter(id => id !== user.id) 
-            : [...a.likes, user.id]
+          likes: hasLiked ? a.likes.filter(id => id !== user.id) : [...a.likes, user.id]
         };
       }
       return a;
     }));
+
+    // Sincronizar com Supabase
+    try {
+      if (hasLiked) {
+        await supabase
+          .from('announcement_likes')
+          .delete()
+          .match({ announcement_id: postId, user_id: user.id });
+      } else {
+        await supabase
+          .from('announcement_likes')
+          .insert({ announcement_id: postId, user_id: user.id });
+      }
+    } catch (error) {
+      console.error("Erro ao processar curtida:", error);
+    }
   };
 
-  const handleAddComment = (postId: string) => {
+  const handleAddComment = async (postId: string) => {
     if (!commentText.trim()) return;
-    const newComment: Comment = {
-      id: Math.random().toString(36).substr(2, 9),
-      author: `${user.name} (${user.unit})`,
+    
+    setLoading(prev => ({ ...prev, [postId]: true }));
+
+    const dbComment = {
+      announcement_id: postId,
+      author_name: user.name,
+      author_unit: user.unit,
       content: commentText,
-      date: new Date()
+      user_id: user.id
     };
 
-    setAnnouncements(prev => prev.map(a => {
-      if (a.id === postId) {
-        return { ...a, comments: [...a.comments, newComment] };
-      }
-      return a;
-    }));
-    setCommentText('');
-    setActiveCommentBox(null);
+    try {
+      const { data, error } = await supabase
+        .from('announcement_comments')
+        .insert(dbComment)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newComment: Comment = {
+        id: data.id,
+        author: `${data.author_name} (${data.author_unit})`,
+        content: data.content,
+        date: new Date(data.created_at)
+      };
+
+      setAnnouncements(prev => prev.map(a => {
+        if (a.id === postId) {
+          return { ...a, comments: [...a.comments, newComment] };
+        }
+        return a;
+      }));
+      
+      setCommentText('');
+      setActiveCommentBox(null);
+    } catch (error) {
+      console.error("Erro ao postar comentário:", error);
+    } finally {
+      setLoading(prev => ({ ...prev, [postId]: false }));
+    }
   };
 
   return (
@@ -190,13 +276,16 @@ const BoardView: React.FC<BoardViewProps> = ({ user, announcements, setAnnouncem
                 {(activeCommentBox === a.id || a.comments.length > 0) && (
                   <div className="mt-4 pt-4 border-t border-slate-50 dark:border-white/5 space-y-4">
                     {a.comments.map(c => (
-                      <div key={c.id} className="flex gap-3 text-sm bg-slate-50 dark:bg-white/5 p-3 rounded-xl">
+                      <div key={c.id} className="flex gap-3 text-sm bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-100 dark:border-white/5">
                         <div className="w-8 h-8 rounded-full bg-brand-4 flex items-center justify-center font-bold text-brand-1 shrink-0 text-xs">
                           {c.author.charAt(0)}
                         </div>
                         <div>
-                          <p className="font-bold text-brand-1 dark:text-white text-xs">{c.author}</p>
-                          <p className="text-slate-600 dark:text-slate-400 mt-0.5">{c.content}</p>
+                          <p className="font-bold text-brand-1 dark:text-white text-[11px] leading-tight">{c.author}</p>
+                          <p className="text-slate-600 dark:text-slate-400 mt-1 text-sm">{c.content}</p>
+                          <p className="text-[9px] text-slate-400 mt-1 uppercase font-bold tracking-tighter">
+                            {new Date(c.date).toLocaleDateString('pt-BR')} às {new Date(c.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
                         </div>
                       </div>
                     ))}
@@ -208,15 +297,17 @@ const BoardView: React.FC<BoardViewProps> = ({ user, announcements, setAnnouncem
                           value={commentText}
                           onChange={(e) => setCommentText(e.target.value)}
                           placeholder="Escreva um comentário..."
-                          className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-3/20 dark:text-white"
+                          disabled={loading[a.id]}
+                          className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-3/20 dark:text-white disabled:opacity-50"
                           autoFocus
                           onKeyPress={(e) => e.key === 'Enter' && handleAddComment(a.id)}
                         />
                         <button 
                           onClick={() => handleAddComment(a.id)}
-                          className="bg-brand-1 dark:bg-brand-3 text-white px-4 py-2 rounded-xl text-sm font-bold"
+                          disabled={loading[a.id] || !commentText.trim()}
+                          className="bg-brand-1 dark:bg-brand-3 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
                         >
-                          Postar
+                          {loading[a.id] ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Postar'}
                         </button>
                       </div>
                     )}
