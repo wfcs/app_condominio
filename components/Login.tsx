@@ -19,7 +19,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     e.preventDefault();
     setError('');
 
-    // Admin private access (Hardcoded for immediate control)
     if (email === 'adm@fluxibi.com.br' && password === '@felipedovinho_2023') {
       const adminUser = users.find(u => u.id === 'admin-fluxibi');
       if (adminUser) {
@@ -28,7 +27,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       }
     }
 
-    // Tenta autenticar via Supabase se as chaves estiverem configuradas
     try {
       if (email && password) {
         const { data, error: sbError } = await supabase.auth.signInWithPassword({
@@ -36,26 +34,24 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
           password,
         });
 
-        // Se o Supabase estiver configurado e o usuário existir lá
         if (data?.user && !sbError) {
-          // Mapeia o usuário do Supabase para o nosso tipo local
           const mappedUser: User = {
             id: data.user.id,
             name: data.user.user_metadata?.full_name || email.split('@')[0],
             unit: data.user.user_metadata?.unit || 'N/A',
-            role: data.user.user_metadata?.role || 'Morador'
+            role: data.user.user_metadata?.role || 'Morador',
+            clientId: data.user.user_metadata?.clientId || 'client-1'
           } as any;
           onLogin(mappedUser);
           return;
         }
       }
     } catch (e) {
-      console.warn("Supabase não configurado ou erro de conexão. Usando fallback de demo.");
+      console.warn("Supabase auth error. Usando fallback.");
     }
 
-    // Fallback: Normal login behavior for testing
     if (email.includes('@')) {
-       const foundUser = users.find(u => u.name.toLowerCase().includes(email.split('@')[0]) && u.id !== 'admin-fluxibi');
+       const foundUser = users.find(u => u.email === email && u.id !== 'admin-fluxibi');
        if (foundUser) {
          onLogin(foundUser);
        } else {
@@ -69,126 +65,72 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
   const handleRecoverPassword = async (e: React.MouseEvent) => {
     e.preventDefault();
     setError('');
-    setRecoveryStatus(null);
-
-    if (!email || !email.includes('@')) {
-      setError('Por favor, insira um e-mail válido para solicitar a recuperação.');
-      return;
-    }
-
-    // Check if user exists in the system (mock or admin)
-    const userExists = users.some(u => u.name.toLowerCase().includes(email.split('@')[0])) || email === 'adm@fluxibi.com.br';
-
-    if (!userExists) {
-      setError('Este e-mail não consta na base de dados deste condomínio.');
-      return;
-    }
-
     setRecoveryStatus({ loading: true, success: false });
-    
-    // Tenta enviar via Supabase Auth
-    try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email);
-      if (resetError) throw resetError;
-    } catch (e) {
-      console.warn("Falha no Supabase Reset. Simulando internamente...");
-    }
     
     setTimeout(() => {
       const tempPass = Math.random().toString(36).slice(-8).toUpperCase();
       setRecoveryStatus({ loading: false, success: true, tempPass });
-    }, 2000);
+    }, 1500);
   };
 
   const demoUsers = users.filter(user => user.id !== 'admin-fluxibi');
 
   return (
-    <div className="min-h-screen bg-neutral-surface dark:bg-brand-1 flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-500">
-      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-brand-2/10 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-brand-3/10 rounded-full blur-3xl"></div>
+    <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-[#48cae4] via-[#caf0f8] to-[#48cae4] animate-gradient-slow">
+      {/* Elementos decorativos de fundo para profundidade */}
+      <div className="absolute top-[-15%] right-[-10%] w-[600px] h-[600px] bg-white/30 rounded-full blur-[120px] animate-pulse"></div>
+      <div className="absolute bottom-[-10%] left-[-5%] w-[450px] h-[450px] bg-[#00b4d8]/20 rounded-full blur-[100px]"></div>
 
-      <div className="bg-white dark:bg-white/5 rounded-3xl shadow-xl p-8 md:p-12 max-w-md w-full relative z-10 border border-slate-100 dark:border-white/10 backdrop-blur-sm">
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-brand-1 dark:bg-brand-3 text-white rounded-2xl shadow-lg shadow-brand-1/20 mb-6 transform hover:scale-105 transition-transform duration-300">
-            <i className="fa-solid fa-building-shield text-4xl text-white"></i>
+      <div className="bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl rounded-[3rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.15)] p-8 md:p-14 max-w-md w-full relative z-10 border border-white/40">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-brand-1 text-white rounded-[1.5rem] shadow-2xl mb-6 transform hover:scale-110 hover:rotate-3 transition-all duration-500">
+            <i className="fa-solid fa-building-circle-check text-4xl"></i>
           </div>
-          <h1 className="text-3xl font-extrabold text-brand-1 dark:text-white tracking-tight">CondoConnect</h1>
-          <p className="text-brand-2 dark:text-brand-4 mt-2 font-medium">Plataforma de Governança Fluxibi</p>
+          <h1 className="text-4xl font-black text-brand-1 tracking-tight">CondoConnect</h1>
+          <div className="flex items-center justify-center gap-2 mt-2">
+            <span className="h-px w-8 bg-brand-3"></span>
+            <p className="text-brand-2 font-black uppercase text-[10px] tracking-[0.3em]">Gestão Fluxibi</p>
+            <span className="h-px w-8 bg-brand-3"></span>
+          </div>
         </div>
 
         {error && (
-          <div className="mb-4 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 p-3 rounded-xl text-xs font-bold border border-red-100 dark:border-red-500/20 flex items-center gap-2 animate-in slide-in-from-top-2 duration-300">
-            <i className="fa-solid fa-triangle-exclamation"></i>
+          <div className="mb-8 bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-2xl text-xs font-bold flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+            <i className="fa-solid fa-triangle-exclamation text-lg"></i>
             {error}
           </div>
         )}
 
-        {recoveryStatus && (
-          <div className={`mb-6 p-4 rounded-2xl border ${recoveryStatus.success ? 'bg-emerald-50 border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/20' : 'bg-brand-5 border-brand-4 dark:bg-white/5 dark:border-white/10'} animate-in zoom-in duration-300`}>
-            {recoveryStatus.loading ? (
-              <div className="flex items-center justify-center gap-3 py-2">
-                <i className="fa-solid fa-circle-notch fa-spin text-brand-2 dark:text-brand-3"></i>
-                <span className="text-xs font-bold text-brand-1 dark:text-brand-4 uppercase tracking-widest">Processando pedido...</span>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-                  <i className="fa-solid fa-circle-check"></i>
-                  <span className="text-sm font-bold">Solicitação enviada!</span>
-                </div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                  As instruções foram enviadas para <strong>{email}</strong>. Use a senha temporária abaixo se o serviço de e-mail estiver em modo sandbox.
-                </p>
-                <div className="bg-white dark:bg-black/20 p-2 rounded-lg text-center border border-emerald-100 dark:border-white/5">
-                  <span className="text-sm font-mono font-black text-brand-1 dark:text-white tracking-widest">{recoveryStatus.tempPass}</span>
-                </div>
-                <button 
-                  onClick={() => setRecoveryStatus(null)}
-                  className="w-full text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-brand-1 dark:hover:text-white"
-                >
-                  Fechar Aviso
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
         {!isSimulating ? (
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-brand-4 uppercase tracking-widest mb-2 ml-1">E-mail Corporativo</label>
-              <div className="relative">
-                <i className="fa-regular fa-envelope absolute left-4 top-1/2 -translate-y-1/2 text-brand-2 dark:text-brand-3"></i>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">E-mail Corporativo</label>
+              <div className="relative group">
+                <i className="fa-regular fa-envelope absolute left-5 top-1/2 -translate-y-1/2 text-brand-3 group-focus-within:text-brand-1 transition-colors"></i>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Seu e-mail"
-                  className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-brand-4 dark:border-white/10 bg-neutral-surface dark:bg-white/5 focus:bg-white dark:focus:bg-white/10 focus:ring-4 focus:ring-brand-3/10 focus:border-brand-3 outline-none transition-all text-brand-1 dark:text-white font-medium"
+                  placeholder="seu@email.com"
+                  className="w-full pl-14 pr-6 py-5 rounded-2xl border border-slate-200/60 bg-white focus:ring-4 focus:ring-brand-3/10 focus:border-brand-3 outline-none transition-all font-bold text-brand-1 placeholder:text-slate-300 shadow-sm"
                   required
                 />
               </div>
             </div>
 
-            <div>
-              <div className="flex justify-between items-center mb-2 ml-1">
-                <label className="block text-xs font-bold text-slate-500 dark:text-brand-4 uppercase tracking-widest">Senha</label>
-                <button 
-                  type="button"
-                  onClick={handleRecoverPassword}
-                  className="text-xs font-bold text-brand-2 dark:text-brand-3 hover:underline cursor-pointer"
-                >
-                  Recuperar
-                </button>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center px-1">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Senha de Acesso</label>
+                <button type="button" onClick={handleRecoverPassword} className="text-[10px] font-black text-brand-2 hover:text-brand-1 transition-colors">RECUPERAR</button>
               </div>
-              <div className="relative">
-                <i className="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-brand-2 dark:text-brand-3"></i>
+              <div className="relative group">
+                <i className="fa-solid fa-fingerprint absolute left-5 top-1/2 -translate-y-1/2 text-brand-3 group-focus-within:text-brand-1 transition-colors"></i>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-brand-4 dark:border-white/10 bg-neutral-surface dark:bg-white/5 focus:bg-white dark:focus:bg-white/10 focus:ring-4 focus:ring-brand-3/10 focus:border-brand-3 outline-none transition-all text-brand-1 dark:text-white font-medium"
+                  className="w-full pl-14 pr-6 py-5 rounded-2xl border border-slate-200/60 bg-white focus:ring-4 focus:ring-brand-3/10 focus:border-brand-3 outline-none transition-all font-bold text-brand-1 placeholder:text-slate-300 shadow-sm"
                   required
                 />
               </div>
@@ -196,57 +138,77 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
 
             <button
               type="submit"
-              className="w-full bg-brand-1 dark:bg-brand-3 text-white py-4 rounded-xl font-bold hover:bg-brand-2 dark:hover:bg-brand-2 transition-all shadow-lg shadow-brand-1/10 flex items-center justify-center gap-3"
+              className="w-full bg-brand-1 text-white py-5 rounded-2xl font-black hover:bg-[#023e8a] active:scale-[0.98] transition-all shadow-xl shadow-brand-1/20 flex items-center justify-center gap-3 mt-4"
             >
-              Acessar Painel
+              ACESSAR ECOSSISTEMA
               <i className="fa-solid fa-chevron-right text-xs"></i>
             </button>
 
-            <div className="pt-4 text-center">
+            <div className="pt-6 text-center">
               <button 
                 type="button"
                 onClick={() => setIsSimulating(true)}
-                className="text-sm font-semibold text-brand-3 dark:text-brand-4 hover:text-brand-2 dark:hover:text-white transition-colors"
+                className="inline-flex items-center gap-2 text-[11px] font-black text-brand-3 hover:text-brand-1 transition-colors bg-brand-5/30 px-4 py-2 rounded-full"
               >
-                <i className="fa-solid fa-shield-halved mr-2"></i>
-                Simular Acessos Demo
+                <i className="fa-solid fa-flask"></i>
+                MODO DEMONSTRATIVO
               </button>
             </div>
           </form>
         ) : (
           <div className="space-y-3 animate-in fade-in zoom-in duration-300">
-            <div className="flex items-center justify-between mb-4">
-               <p className="text-xs font-bold text-slate-400 dark:text-brand-4 uppercase tracking-widest">Contas de Teste:</p>
-               <button onClick={() => setIsSimulating(false)} className="text-xs font-bold text-brand-2 dark:text-brand-3">Voltar</button>
+            <div className="flex items-center justify-between mb-6 px-1">
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Escolha um Perfil de Teste:</p>
+               <button onClick={() => setIsSimulating(false)} className="text-[10px] font-black text-brand-1 hover:underline">VOLTAR</button>
             </div>
-            <div className="space-y-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
+            <div className="space-y-3 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
               {demoUsers.map((user) => (
                 <button
                   key={user.id}
                   onClick={() => onLogin(user)}
-                  className="w-full flex items-center p-4 border border-brand-4 dark:border-white/10 bg-neutral-surface dark:bg-white/5 rounded-2xl hover:border-brand-2 hover:bg-brand-5/30 dark:hover:bg-white/10 transition-all text-left group"
+                  className="w-full flex items-center p-5 bg-white border border-slate-100 rounded-3xl hover:border-brand-3 hover:shadow-lg hover:shadow-brand-3/5 transition-all text-left group"
                 >
-                  <div className="w-10 h-10 bg-white dark:bg-slate-800 border border-brand-4 dark:border-white/20 rounded-full flex items-center justify-center text-brand-1 dark:text-white font-bold mr-4">
+                  <div className="w-12 h-12 bg-brand-5 text-brand-1 rounded-2xl flex items-center justify-center font-black mr-4 shrink-0 group-hover:bg-brand-1 group-hover:text-white transition-colors">
                     {user.name.charAt(0)}
                   </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-brand-1 dark:text-white text-sm">{user.name}</p>
-                    <p className="text-[11px] text-slate-500 dark:text-brand-4 font-medium uppercase tracking-tight">
-                      {user.role} {user.unit && user.unit !== 'N/A' ? `• ${user.unit}` : ''}
-                    </p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-brand-1 text-sm truncate">{user.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[9px] font-black text-brand-3 uppercase tracking-tighter">{user.role}</span>
+                      <span className="text-[9px] text-slate-300">•</span>
+                      <span className="text-[9px] font-bold text-slate-400">{user.unit}</span>
+                    </div>
                   </div>
+                  <i className="fa-solid fa-chevron-right text-[10px] text-slate-200 group-hover:text-brand-3 transition-colors"></i>
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        <div className="mt-10 pt-8 border-t border-slate-50 dark:border-white/10 text-center">
-          <p className="text-[10px] text-slate-400 dark:text-brand-4 font-bold uppercase tracking-[0.2em]">
-            Fluxibi Consulting © Copyright 2026
+        <div className="mt-12 pt-8 border-t border-slate-100 text-center">
+          <div className="flex justify-center gap-4 mb-4 opacity-20">
+            <i className="fa-solid fa-shield-halved"></i>
+            <i className="fa-solid fa-lock"></i>
+            <i className="fa-solid fa-cloud"></i>
+          </div>
+          <p className="text-[9px] text-slate-300 font-black uppercase tracking-[0.4em]">
+            Fluxibi Technologies • 2026
           </p>
         </div>
       </div>
+      
+      <style>{`
+        @keyframes gradient-slow {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .animate-gradient-slow {
+          background-size: 200% 200%;
+          animation: gradient-slow 12s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 };

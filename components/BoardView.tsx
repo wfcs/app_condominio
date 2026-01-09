@@ -21,49 +21,52 @@ const BoardView: React.FC<BoardViewProps> = ({ user, announcements, setAnnouncem
 
   const categories = ['Todos', 'Assembleia', 'Comunicado', 'Evento', 'Brechó', 'Social'];
 
-  // Efeito para carregar interações do Supabase ao montar ou ao mudar os anúncios
   useEffect(() => {
     const fetchInteractions = async () => {
-      // Para cada anúncio, buscamos curtidas e comentários reais
-      const updatedAnnouncements = await Promise.all(announcements.map(async (a) => {
-        // Buscar Likes
-        const { data: likes } = await supabase
-          .from('announcement_likes')
-          .select('user_id')
-          .eq('announcement_id', a.id);
+      try {
+        const updatedAnnouncements = await Promise.all(announcements.map(async (a) => {
+          const { data: likes, error: likesError } = await supabase
+            .from('announcement_likes')
+            .select('user_id')
+            .eq('announcement_id', a.id);
 
-        // Buscar Comentários
-        const { data: comments } = await supabase
-          .from('announcement_comments')
-          .select('*')
-          .eq('announcement_id', a.id)
-          .order('created_at', { ascending: true });
+          const { data: comments, error: commError } = await supabase
+            .from('announcement_comments')
+            .select('*')
+            .eq('announcement_id', a.id)
+            .order('created_at', { ascending: true });
 
-        return {
-          ...a,
-          likes: likes?.map(l => l.user_id) || [],
-          comments: comments?.map(c => ({
-            id: c.id,
-            author: `${c.author_name} (${c.author_unit})`,
-            content: c.content,
-            date: new Date(c.created_at)
-          })) || []
-        };
-      }));
+          // Se houver erro (tabela não existe), apenas retornamos o anúncio original
+          if (likesError || commError) return a;
 
-      // Evita loop infinito comparando se houve mudança real (simplificado)
-      setAnnouncements(updatedAnnouncements);
+          return {
+            ...a,
+            likes: likes?.map(l => l.user_id) || [],
+            comments: comments?.map(c => ({
+              id: c.id,
+              author: `${c.author_name} (${c.author_unit})`,
+              content: c.content,
+              date: new Date(c.created_at)
+            })) || []
+          };
+        }));
+
+        setAnnouncements(updatedAnnouncements);
+      } catch (err) {
+        console.warn("Mural: Falha ao carregar interações do banco. Verifique as tabelas announcement_likes e announcement_comments.");
+      }
     };
 
-    fetchInteractions();
-  }, [announcements.length]); // Executa quando a lista de anúncios muda (ex: novo post)
+    if (announcements.length > 0) fetchInteractions();
+  }, [announcements.length]);
 
   const filtered = filter === 'Todos' ? announcements : announcements.filter(a => a.category === filter);
 
   const addPost = async () => {
     if (!title || !content) return;
     const post: Announcement = {
-      id: Date.now().toString(), // Em um cenário real, o DB geraria este ID
+      id: Date.now().toString(),
+      clientId: user.clientId,
       title,
       content,
       category,
@@ -74,7 +77,6 @@ const BoardView: React.FC<BoardViewProps> = ({ user, announcements, setAnnouncem
       comments: []
     };
     
-    // Aqui poderíamos salvar o post no DB também se você criou a tabela de announcements
     setAnnouncements([post, ...announcements]);
     setShowAdd(false);
     setTitle('');
@@ -84,10 +86,8 @@ const BoardView: React.FC<BoardViewProps> = ({ user, announcements, setAnnouncem
   const handleLike = async (postId: string) => {
     const post = announcements.find(a => a.id === postId);
     if (!post) return;
-
     const hasLiked = post.likes.includes(user.id);
 
-    // Optimistic Update na UI
     setAnnouncements(prev => prev.map(a => {
       if (a.id === postId) {
         return {
@@ -98,7 +98,6 @@ const BoardView: React.FC<BoardViewProps> = ({ user, announcements, setAnnouncem
       return a;
     }));
 
-    // Sincronizar com Supabase
     try {
       if (hasLiked) {
         await supabase
@@ -111,27 +110,24 @@ const BoardView: React.FC<BoardViewProps> = ({ user, announcements, setAnnouncem
           .insert({ announcement_id: postId, user_id: user.id });
       }
     } catch (error) {
-      console.error("Erro ao processar curtida:", error);
+      console.error("Erro ao curtir:", error);
     }
   };
 
   const handleAddComment = async (postId: string) => {
     if (!commentText.trim()) return;
-    
     setLoading(prev => ({ ...prev, [postId]: true }));
-
-    const dbComment = {
-      announcement_id: postId,
-      author_name: user.name,
-      author_unit: user.unit,
-      content: commentText,
-      user_id: user.id
-    };
 
     try {
       const { data, error } = await supabase
         .from('announcement_comments')
-        .insert(dbComment)
+        .insert({
+          announcement_id: postId,
+          author_name: user.name,
+          author_unit: user.unit,
+          content: commentText,
+          user_id: user.id
+        })
         .select()
         .single();
 
@@ -145,16 +141,13 @@ const BoardView: React.FC<BoardViewProps> = ({ user, announcements, setAnnouncem
       };
 
       setAnnouncements(prev => prev.map(a => {
-        if (a.id === postId) {
-          return { ...a, comments: [...a.comments, newComment] };
-        }
+        if (a.id === postId) return { ...a, comments: [...a.comments, newComment] };
         return a;
       }));
-      
       setCommentText('');
       setActiveCommentBox(null);
     } catch (error) {
-      console.error("Erro ao postar comentário:", error);
+      console.error("Erro ao comentar:", error);
     } finally {
       setLoading(prev => ({ ...prev, [postId]: false }));
     }
@@ -272,10 +265,9 @@ const BoardView: React.FC<BoardViewProps> = ({ user, announcements, setAnnouncem
                   </div>
                 </div>
 
-                {/* Seção de Comentários */}
-                {(activeCommentBox === a.id || a.comments.length > 0) && (
+                {(activeCommentBox === a.id || (a.comments && a.comments.length > 0)) && (
                   <div className="mt-4 pt-4 border-t border-slate-50 dark:border-white/5 space-y-4">
-                    {a.comments.map(c => (
+                    {a.comments?.map(c => (
                       <div key={c.id} className="flex gap-3 text-sm bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-100 dark:border-white/5">
                         <div className="w-8 h-8 rounded-full bg-brand-4 flex items-center justify-center font-bold text-brand-1 shrink-0 text-xs">
                           {c.author.charAt(0)}
@@ -283,9 +275,6 @@ const BoardView: React.FC<BoardViewProps> = ({ user, announcements, setAnnouncem
                         <div>
                           <p className="font-bold text-brand-1 dark:text-white text-[11px] leading-tight">{c.author}</p>
                           <p className="text-slate-600 dark:text-slate-400 mt-1 text-sm">{c.content}</p>
-                          <p className="text-[9px] text-slate-400 mt-1 uppercase font-bold tracking-tighter">
-                            {new Date(c.date).toLocaleDateString('pt-BR')} às {new Date(c.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                          </p>
                         </div>
                       </div>
                     ))}

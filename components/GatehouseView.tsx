@@ -17,9 +17,11 @@ const GatehouseView: React.FC<GatehouseViewProps> = ({ user, onSendNotification 
     e.preventDefault();
     if (!unit || !desc) return;
 
+    // Fix: Added missing clientId property
     const newNotif: Notification = {
       id: Math.random().toString(36).substr(2, 9),
       unitId: unit,
+      clientId: user.clientId,
       type: type,
       description: `${type === 'entrega' ? 'Encomenda' : 'Visitante'}: ${desc}`,
       timestamp: new Date(),

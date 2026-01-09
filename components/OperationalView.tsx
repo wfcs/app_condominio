@@ -16,8 +16,10 @@ const OperationalView: React.FC<OperationalViewProps> = ({ user, tasks, setTasks
 
   const addTask = () => {
     if (!desc) return;
+    // Fix: Added missing clientId property
     const task: OperationalTask = {
       id: Date.now().toString(),
+      clientId: user.clientId,
       type,
       priority,
       description: desc,
