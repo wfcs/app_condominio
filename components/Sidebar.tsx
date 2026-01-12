@@ -16,7 +16,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
     { id: 'board', label: 'Mural', icon: 'fa-clipboard-list', roles: Object.values(UserRole) },
     { id: 'gatehouse', label: 'Portaria', icon: 'fa-shield-halved', roles: [UserRole.PORTARIA, UserRole.SINDICO] },
     { id: 'operational', label: 'Operacional', icon: 'fa-tools', roles: [UserRole.MANUTENCAO, UserRole.SINDICO] },
-    { id: 'management', label: 'Gestão de Usuários', icon: 'fa-users-gear', roles: [UserRole.SINDICO] },
+    { id: 'management', label: user.role === UserRole.SINDICO ? 'Administração' : 'Gestão', icon: 'fa-briefcase', roles: [UserRole.SINDICO] },
   ];
 
   const visibleItems = menuItems.filter(item => item.roles.includes(user.role));
@@ -28,32 +28,38 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
           <div className="bg-brand-3 p-2 rounded-lg">
             <i className="fa-solid fa-building text-xl text-brand-1"></i>
           </div>
-          <span className="text-xl font-bold tracking-tight">CondoConnect</span>
+          <span className="text-xl font-black tracking-tight uppercase text-[15px]">CondoConnect</span>
         </div>
       </div>
 
-      <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
         {visibleItems.map(item => (
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              activeTab === item.id ? 'bg-brand-2 text-white shadow-lg shadow-black/20' : 'text-brand-4/60 hover:text-white hover:bg-white/10'
+            className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all ${
+              activeTab === item.id 
+                ? 'bg-gradient-to-r from-brand-2 to-brand-3 text-white shadow-lg shadow-black/20 transform scale-[1.02]' 
+                : 'text-brand-4/60 hover:text-white hover:bg-white/5'
             }`}
           >
-            <i className={`fa-solid ${item.icon} w-5 text-center`}></i>
-            <span className="font-medium">{item.label}</span>
+            <i className={`fa-solid ${item.icon} w-5 text-center text-sm`}></i>
+            <span className="font-bold text-[13px] uppercase tracking-wide">{item.label}</span>
           </button>
         ))}
       </nav>
 
       <div className="p-4 border-t border-white/10">
+        <div className="bg-white/5 p-4 rounded-2xl mb-4 text-center">
+           <p className="text-[9px] font-black text-brand-3 uppercase tracking-widest mb-1">Licença Fluxibi</p>
+           <p className="text-[10px] text-white/50 font-bold italic">Standard Plan</p>
+        </div>
         <button
           onClick={onLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-brand-4/60 hover:text-red-400 hover:bg-white/10 transition-colors"
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-brand-4/60 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
         >
-          <i className="fa-solid fa-right-from-bracket w-5 text-center"></i>
-          <span className="font-medium">Sair</span>
+          <i className="fa-solid fa-power-off w-5 text-center"></i>
+          <span className="font-bold text-[13px] uppercase tracking-wide">Encerrar Sessão</span>
         </button>
       </div>
     </div>
