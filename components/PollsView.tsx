@@ -68,7 +68,6 @@ const PollsView: React.FC<PollsViewProps> = ({ user, polls, setPolls }) => {
       setErrorInfo(null);
     } catch (error: any) {
       console.error("Erro ao carregar enquetes:", error);
-      // Fix: Converte o objeto de erro para string amigável
       let errorMessage = "Erro de conexão com o servidor.";
       if (error && typeof error === 'object' && error.message) {
         errorMessage = error.message;
