@@ -10,37 +10,145 @@ interface ManagementViewProps {
   currentUser: User;
 }
 
+interface BudgetCategory {
+  name: string;
+  budgeted: number;
+  actual: number;
+  icon: string;
+}
+
 const ManagementView: React.FC<ManagementViewProps> = ({ users, setUsers, clients, setClients, currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'users' | 'clients' | 'suppliers' | 'docs' | 'contracts' | 'finance' | 'debtors'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'clients' | 'suppliers' | 'docs' | 'finance' | 'debtors'>('users');
   
-  // States para novas funcionalidades (Simulados para protótipo)
-  const [suppliers, setSuppliers] = useState([
+  const [suppliers] = useState([
     { id: 1, name: 'Elevadores Atlas', contact: 'Marcos (11) 9999-8888', category: 'Manutenção' },
     { id: 2, name: 'Jardins & Cia', contact: 'Sueli (11) 9777-7777', category: 'Jardinagem' }
   ]);
 
-  const [docs, setDocs] = useState([
+  const [docs] = useState([
     { id: 1, name: 'Seguro Predial', expiration: '2026-05-20', status: 'Vigente' },
     { id: 2, name: 'AVCB - Bombeiros', expiration: '2024-12-10', status: 'Próximo ao Vencimento' },
     { id: 3, name: 'Dedetização', expiration: '2024-03-01', status: 'Vencido' }
   ]);
 
-  const [finances, setFinances] = useState({
-    revenue: 45000.00,
-    expenses: 32450.00,
-    pendingApproval: 1250.00
-  });
+  // Dados de Exemplo: Orçado vs Realizado
+  const [budgetData] = useState<BudgetCategory[]>([
+    { name: 'Folha de Pagamento', budgeted: 18000, actual: 17850, icon: 'fa-users-gears' },
+    { name: 'Manutenção Preventiva', budgeted: 5000, actual: 6200, icon: 'fa-screwdriver-wrench' },
+    { name: 'Consumo (Água/Luz)', budgeted: 8500, actual: 9100, icon: 'fa-faucet-drip' },
+    { name: 'Segurança / Portaria', budgeted: 12000, actual: 12000, icon: 'fa-shield-halved' },
+    { name: 'Fundo de Reserva', budgeted: 4500, actual: 4500, icon: 'fa-piggy-bank' },
+  ]);
 
-  const [debtors, setDebtors] = useState([
+  const [debtors] = useState([
     { unit: '101A', value: 1250.00, months: 2 },
     { unit: '304B', value: 625.00, months: 1 }
   ]);
 
   const isMaster = currentUser.id === 'admin-fluxibi';
-  const isSindico = currentUser.role === UserRole.SINDICO;
-
-  // Fix: Defined visibleUsers based on the user's clientId or global access
   const visibleUsers = isMaster ? users : users.filter(u => u.clientId === currentUser.clientId);
+
+  const totalBudgeted = budgetData.reduce((acc, curr) => acc + curr.budgeted, 0);
+  const totalActual = budgetData.reduce((acc, curr) => acc + curr.actual, 0);
+  const budgetPerformance = (totalActual / totalBudgeted) * 100;
+
+  const renderFinance = () => (
+    <div className="space-y-8">
+      {/* Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Orçado (Mês)</p>
+          <p className="text-2xl font-black text-brand-1">R$ {totalBudgeted.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+          <div className="mt-4 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full bg-brand-3 w-full"></div>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Realizado</p>
+          <p className={`text-2xl font-black ${totalActual > totalBudgeted ? 'text-rose-600' : 'text-emerald-600'}`}>
+            R$ {totalActual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </p>
+          <div className="mt-4 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div 
+              className={`h-full transition-all duration-1000 ${totalActual > totalBudgeted ? 'bg-rose-500' : 'bg-emerald-500'}`} 
+              style={{ width: `${Math.min(budgetPerformance, 100)}%` }}
+            ></div>
+          </div>
+        </div>
+        <div className="bg-brand-1 p-6 rounded-[2rem] shadow-xl shadow-brand-1/20">
+          <p className="text-[10px] font-black text-brand-4 uppercase tracking-widest mb-1">Desvio Orçamentário</p>
+          <p className="text-2xl font-black text-white">
+            {((totalActual / totalBudgeted - 1) * 100).toFixed(1)}%
+          </p>
+          <p className="text-[10px] text-brand-5 mt-2 font-bold italic">
+            {totalActual > totalBudgeted ? '⚠️ Acima do planejado' : '✅ Dentro da meta'}
+          </p>
+        </div>
+      </div>
+
+      {/* Orçado vs Realizado Table/List */}
+      <div className="bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-sm">
+        <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+          <div>
+            <h3 className="font-black text-brand-1 uppercase tracking-tight">Comparativo Orçamentário</h3>
+            <p className="text-xs text-slate-500 font-bold">Análise detalhada por categoria de custo</p>
+          </div>
+          <button className="bg-white border border-slate-200 text-brand-1 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">
+            Exportar PDF
+          </button>
+        </div>
+        
+        <div className="p-8 space-y-8">
+          {budgetData.map((cat, i) => {
+            const percent = (cat.actual / cat.budgeted) * 100;
+            const isOver = cat.actual > cat.budgeted;
+
+            return (
+              <div key={i} className="group">
+                <div className="flex justify-between items-end mb-3">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isOver ? 'bg-rose-50 text-rose-600' : 'bg-brand-5 text-brand-1'}`}>
+                      <i className={`fa-solid ${cat.icon}`}></i>
+                    </div>
+                    <div>
+                      <p className="font-black text-brand-1 text-sm uppercase tracking-wide">{cat.name}</p>
+                      <p className="text-[10px] text-slate-400 font-bold">ORÇADO: R$ {cat.budgeted.toLocaleString('pt-BR')}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={`font-black text-sm ${isOver ? 'text-rose-600' : 'text-slate-700'}`}>
+                      R$ {cat.actual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className={`text-[10px] font-black ${isOver ? 'text-rose-400' : 'text-emerald-500'}`}>
+                      {percent.toFixed(1)}% utilizado
+                    </p>
+                  </div>
+                </div>
+                <div className="h-3 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200/50">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-1000 ${isOver ? 'bg-rose-500' : 'bg-brand-3'}`}
+                    style={{ width: `${Math.min(percent, 100)}%` }}
+                  ></div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="bg-amber-50 p-8 rounded-[2.5rem] border-2 border-dashed border-amber-200 text-center">
+        <i className="fa-solid fa-receipt text-3xl text-amber-400 mb-4"></i>
+        <h4 className="font-bold text-amber-800">Aprovação de Notas Fiscais</h4>
+        <p className="text-sm text-amber-700 max-w-md mx-auto mt-2 font-medium">
+          Existem 4 despesas extras este mês que ultrapassaram o orçado. 
+          O síndico deve validar a justificativa para o fechamento.
+        </p>
+        <button className="mt-6 bg-amber-500 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-amber-500/20">
+          Revisar Notas Pendentes
+        </button>
+      </div>
+    </div>
+  );
 
   const renderSuppliers = () => (
     <div className="space-y-6">
@@ -98,31 +206,6 @@ const ManagementView: React.FC<ManagementViewProps> = ({ users, setUsers, client
     </div>
   );
 
-  const renderFinance = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100">
-          <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Receita Condominial</p>
-          <p className="text-2xl font-black text-emerald-700">R$ {finances.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-        </div>
-        <div className="bg-rose-50 p-6 rounded-3xl border border-rose-100">
-          <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Despesas Totais</p>
-          <p className="text-2xl font-black text-rose-700">R$ {finances.expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-        </div>
-        <div className="bg-brand-5 p-6 rounded-3xl border border-brand-4/30">
-          <p className="text-[10px] font-black text-brand-2 uppercase tracking-widest mb-1">Saldo em Caixa</p>
-          <p className="text-2xl font-black text-brand-1">R$ {(finances.revenue - finances.expenses).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-        </div>
-      </div>
-      <div className="bg-white p-8 rounded-[2.5rem] border-2 border-dashed border-slate-200 text-center">
-        <i className="fa-solid fa-magnifying-glass-dollar text-4xl text-slate-200 mb-4"></i>
-        <h4 className="font-bold text-brand-1">Módulo de Conciliação Bancária</h4>
-        <p className="text-sm text-slate-500 max-w-sm mx-auto mt-2 italic">Valide as notas fiscais aprovadas com os lançamentos da administradora antes do fechamento do mês.</p>
-        <button className="mt-6 bg-brand-1 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest">Iniciar Auditoria Mensal</button>
-      </div>
-    </div>
-  );
-
   const renderDebtors = () => (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
       <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
@@ -156,9 +239,20 @@ const ManagementView: React.FC<ManagementViewProps> = ({ users, setUsers, client
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-      <div>
-        <h1 className="text-2xl font-black text-brand-1 uppercase tracking-tight">Painel de Administração & Governança</h1>
-        <p className="text-slate-500 font-bold text-sm italic">Gestão estratégica por Fluxibi Technologies.</p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-brand-1 uppercase tracking-tight">Painel de Administração & Governança</h1>
+          <p className="text-slate-500 font-bold text-sm italic">Módulo Síndico • Gestão Profissional Fluxibi</p>
+        </div>
+        <div className="bg-white px-6 py-3 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+           <div className="text-right">
+             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Saldo Atual em Conta</p>
+             <p className="text-lg font-black text-emerald-600">R$ 142.500,00</p>
+           </div>
+           <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+             <i className="fa-solid fa-building-columns"></i>
+           </div>
+        </div>
       </div>
 
       <div className="flex bg-slate-100 p-1.5 rounded-2xl w-full overflow-x-auto custom-scrollbar no-scrollbar">
@@ -168,14 +262,6 @@ const ManagementView: React.FC<ManagementViewProps> = ({ users, setUsers, client
         >
           Usuários
         </button>
-        {isMaster && (
-          <button 
-            onClick={() => setActiveTab('clients')}
-            className={`px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'clients' ? 'bg-white text-brand-1 shadow-md' : 'text-slate-500'}`}
-          >
-            Condomínios
-          </button>
-        )}
         <button 
           onClick={() => setActiveTab('suppliers')}
           className={`px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'suppliers' ? 'bg-white text-brand-1 shadow-md' : 'text-slate-500'}`}
@@ -192,7 +278,7 @@ const ManagementView: React.FC<ManagementViewProps> = ({ users, setUsers, client
           onClick={() => setActiveTab('finance')}
           className={`px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'finance' ? 'bg-white text-brand-1 shadow-md' : 'text-slate-500'}`}
         >
-          Financeiro
+          Orçado vs Realizado
         </button>
         <button 
           onClick={() => setActiveTab('debtors')}
@@ -252,7 +338,6 @@ const ManagementView: React.FC<ManagementViewProps> = ({ users, setUsers, client
             </div>
           </div>
         )}
-        {activeTab === 'clients' && isMaster && <div className="p-10 text-center bg-white rounded-3xl border border-brand-4 italic text-slate-400">Gestão Global de Condomínios (Ativo para Admin)</div>}
         {activeTab === 'suppliers' && renderSuppliers()}
         {activeTab === 'docs' && renderDocs()}
         {activeTab === 'finance' && renderFinance()}
