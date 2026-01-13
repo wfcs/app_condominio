@@ -7,17 +7,29 @@ export enum UserRole {
 }
 
 export interface CondoClient {
-  id: string; // id_cliente incremental ou uuid
-  name: string; // NomeCliente
+  id: string; 
+  name: string;
 }
 
 export interface User {
-  id: string; // id_usuario
+  id: string;
   name: string;
   email: string;
   unit: string;
   role: UserRole;
-  clientId: string; // fk_id_cliente
+  clientId: string;
+}
+
+export interface Visitor {
+  id: string;
+  name: string;
+  entryDate: Date;
+  exitDate: Date | null;
+  vehiclePlate?: string;
+  vehicleType?: string;
+  unitVisited: string;
+  authorizedBy: string;
+  clientId: string;
 }
 
 export interface Notification {

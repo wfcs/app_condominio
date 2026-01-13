@@ -19,6 +19,7 @@ const PollsView: React.FC<PollsViewProps> = ({ user, polls, setPolls }) => {
 
   const fetchPolls = async () => {
     try {
+      setLoading(true);
       const { data: pollsData, error: pollsError } = await supabase
         .from('polls')
         .select('*')
@@ -27,7 +28,12 @@ const PollsView: React.FC<PollsViewProps> = ({ user, polls, setPolls }) => {
 
       if (pollsError) throw pollsError;
 
-      const fullPolls = await Promise.all((pollsData || []).map(async (p) => {
+      if (!pollsData || pollsData.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      const fullPolls = await Promise.all(pollsData.map(async (p) => {
         try {
           const { data: options } = await supabase
             .from('poll_options')
@@ -56,7 +62,7 @@ const PollsView: React.FC<PollsViewProps> = ({ user, polls, setPolls }) => {
             })) || []
           };
         } catch (innerErr) {
-          console.error("Erro ao carregar detalhes da enquete", p.id);
+          console.error("Erro ao carregar detalhes da enquete", p.id, innerErr);
           return null;
         }
       }));
@@ -67,14 +73,19 @@ const PollsView: React.FC<PollsViewProps> = ({ user, polls, setPolls }) => {
       }
       setErrorInfo(null);
     } catch (error: any) {
-      console.error("Erro ao carregar enquetes:", error);
-      let errorMessage = "Erro de conexão com o servidor.";
-      if (error && typeof error === 'object' && error.message) {
-        errorMessage = error.message;
+      console.error("Erro detalhado ao carregar enquetes:", error);
+      
+      // Extrai a mensagem de erro de forma segura
+      let msg = "Falha na comunicação com o banco de dados.";
+      if (error?.message) {
+        msg = error.message;
       } else if (typeof error === 'string') {
-        errorMessage = error;
+        msg = error;
+      } else if (error?.hint) {
+        msg = `${error.hint} (${error.code || 'N/A'})`;
       }
-      setErrorInfo(`${errorMessage}. Operando em modo de demonstração.`);
+
+      setErrorInfo(`${msg}. Exibindo dados locais/demonstração.`);
     } finally {
       setLoading(false);
     }
@@ -83,6 +94,7 @@ const PollsView: React.FC<PollsViewProps> = ({ user, polls, setPolls }) => {
   useEffect(() => {
     fetchPolls();
     
+    // Configura o realtime apenas se a tabela existir
     const channel = supabase
       .channel('polls-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'poll_votes' }, () => fetchPolls())
@@ -110,6 +122,7 @@ const PollsView: React.FC<PollsViewProps> = ({ user, polls, setPolls }) => {
 
       if (voteError) throw voteError;
 
+      // Update local state for immediate feedback
       setPolls(prev => prev.map(p => {
         if (p.id === pollId) {
           const newOptions = p.options.map(o => o.id === optionId ? { ...o, votes: o.votes + 1 } : o);
@@ -117,9 +130,9 @@ const PollsView: React.FC<PollsViewProps> = ({ user, polls, setPolls }) => {
         }
         return p;
       }));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao votar:", error);
-      alert("Houve um erro ao registrar seu voto no servidor.");
+      alert(`Erro ao registrar voto: ${error.message || "Tabela de votos não encontrada."}`);
     } finally {
       setVotingId(null);
     }
@@ -149,15 +162,26 @@ const PollsView: React.FC<PollsViewProps> = ({ user, polls, setPolls }) => {
         { poll_id: pollData.id, text: 'Abstenção', votes_count: 0 }
       ];
 
-      await supabase.from('poll_options').insert(optionsToInsert);
+      const { error: optError } = await supabase.from('poll_options').insert(optionsToInsert);
+      if (optError) throw optError;
+
       fetchPolls();
       setShowCreate(false);
       setNewTitle('');
       setNewDesc('');
     } catch (error: any) {
-      alert(`Erro ao criar: ${error.message || "Verifique as permissões do banco."}`);
+      alert(`Erro ao criar pauta: ${error.message || "Verifique a estrutura das tabelas 'polls' e 'poll_options'."}`);
     }
   };
+
+  if (loading && polls.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-brand-3 animate-pulse">
+        <i className="fa-solid fa-circle-notch fa-spin text-4xl mb-4"></i>
+        <p className="font-bold uppercase tracking-widest text-xs">Sincronizando Assembleia...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -177,9 +201,12 @@ const PollsView: React.FC<PollsViewProps> = ({ user, polls, setPolls }) => {
       </div>
 
       {errorInfo && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/30 p-4 rounded-2xl flex items-center gap-4 text-amber-800 dark:text-amber-400 text-xs font-bold animate-pulse">
-          <i className="fa-solid fa-triangle-exclamation text-xl"></i>
-          <p><strong>Database Status:</strong> {errorInfo}</p>
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/30 p-4 rounded-2xl flex items-start gap-4 text-amber-800 dark:text-amber-400 text-xs font-bold shadow-sm">
+          <i className="fa-solid fa-triangle-exclamation text-xl mt-0.5"></i>
+          <div>
+            <p className="uppercase tracking-wider">Aviso de Sincronização</p>
+            <p className="font-medium opacity-80 mt-1">{errorInfo}</p>
+          </div>
         </div>
       )}
 
@@ -232,7 +259,7 @@ const PollsView: React.FC<PollsViewProps> = ({ user, polls, setPolls }) => {
                 </div>
 
                 <h3 className="text-2xl font-black text-brand-1 dark:text-white leading-tight mb-4">{p.title}</h3>
-                <p className="text-slate-500 dark:text-slate-400 font-medium text-sm leading-relaxed mb-8">{p.description}</p>
+                <p className="text-slate-500 dark:text-slate-400 font-medium text-sm leading-relaxed mb-8 line-clamp-3">{p.description}</p>
 
                 <div className="space-y-6">
                   {p.options.map(opt => {

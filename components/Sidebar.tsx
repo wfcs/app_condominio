@@ -12,8 +12,9 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogout }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Painel', icon: 'fa-chart-line', roles: Object.values(UserRole) },
+    { id: 'visitors', label: 'Visitantes', icon: 'fa-id-card-clip', roles: [UserRole.PORTARIA, UserRole.SINDICO] },
     { id: 'polls', label: 'Votações', icon: 'fa-square-check', roles: [UserRole.MORADOR, UserRole.SINDICO] },
-    { id: 'board', label: 'Mural', icon: 'fa-clipboard-list', roles: Object.values(UserRole) },
+    { id: 'board', label: 'Mural', icon: 'fa-clipboard-list', roles: [UserRole.MORADOR, UserRole.SINDICO] },
     { id: 'gatehouse', label: 'Portaria', icon: 'fa-shield-halved', roles: [UserRole.PORTARIA, UserRole.SINDICO] },
     { id: 'operational', label: 'Operacional', icon: 'fa-tools', roles: [UserRole.MANUTENCAO, UserRole.SINDICO] },
     { id: 'management', label: user.role === UserRole.SINDICO ? 'Administração' : 'Gestão', icon: 'fa-briefcase', roles: [UserRole.SINDICO] },

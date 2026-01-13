@@ -10,6 +10,7 @@ import PollsView from './components/PollsView';
 import BoardView from './components/BoardView';
 import OperationalView from './components/OperationalView';
 import ManagementView from './components/ManagementView';
+import VisitorsListView from './components/VisitorsListView';
 import Login from './components/Login';
 
 const App: React.FC = () => {
@@ -47,7 +48,6 @@ const App: React.FC = () => {
     setActiveTab('dashboard');
   };
 
-  // Fix: Added missing toggleTheme function
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
   };
@@ -76,6 +76,8 @@ const App: React.FC = () => {
           notifications={filteredNotifications} 
           onNavigate={setActiveTab} 
         />;
+      case 'visitors':
+        return <VisitorsListView user={currentUser} />;
       case 'gatehouse': 
         return <GatehouseView 
           user={currentUser} 
@@ -84,6 +86,10 @@ const App: React.FC = () => {
       case 'polls': 
         return <PollsView user={currentUser} polls={filteredPolls} setPolls={setPolls} />;
       case 'board': 
+        if (![UserRole.MORADOR, UserRole.SINDICO].includes(currentUser.role)) {
+          setActiveTab('dashboard');
+          return null;
+        }
         return <BoardView user={currentUser} announcements={filteredAnnouncements} setAnnouncements={setAnnouncements} />;
       case 'operational': 
         return <OperationalView user={currentUser} tasks={filteredTasks} setTasks={setTasks} />;
