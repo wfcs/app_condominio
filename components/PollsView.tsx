@@ -73,19 +73,17 @@ const PollsView: React.FC<PollsViewProps> = ({ user, polls, setPolls }) => {
       }
       setErrorInfo(null);
     } catch (error: any) {
-      console.error("Erro detalhado ao carregar enquetes:", error);
+      console.error("Erro detectado:", error);
       
-      // Extrai a mensagem de erro de forma segura
-      let msg = "Falha na comunicação com o banco de dados.";
-      if (error?.message) {
-        msg = error.message;
+      // Tratamento robusto de erro para evitar [object Object]
+      let msg = "Falha na conexão com o banco de dados.";
+      if (error && typeof error === 'object') {
+        msg = error.message || error.details || JSON.stringify(error);
       } else if (typeof error === 'string') {
         msg = error;
-      } else if (error?.hint) {
-        msg = `${error.hint} (${error.code || 'N/A'})`;
       }
 
-      setErrorInfo(`${msg}. Exibindo dados locais/demonstração.`);
+      setErrorInfo(`Nota: ${msg}. Utilizando dados locais.`);
     } finally {
       setLoading(false);
     }
@@ -94,7 +92,6 @@ const PollsView: React.FC<PollsViewProps> = ({ user, polls, setPolls }) => {
   useEffect(() => {
     fetchPolls();
     
-    // Configura o realtime apenas se a tabela existir
     const channel = supabase
       .channel('polls-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'poll_votes' }, () => fetchPolls())
@@ -122,7 +119,6 @@ const PollsView: React.FC<PollsViewProps> = ({ user, polls, setPolls }) => {
 
       if (voteError) throw voteError;
 
-      // Update local state for immediate feedback
       setPolls(prev => prev.map(p => {
         if (p.id === pollId) {
           const newOptions = p.options.map(o => o.id === optionId ? { ...o, votes: o.votes + 1 } : o);
@@ -132,7 +128,8 @@ const PollsView: React.FC<PollsViewProps> = ({ user, polls, setPolls }) => {
       }));
     } catch (error: any) {
       console.error("Erro ao votar:", error);
-      alert(`Erro ao registrar voto: ${error.message || "Tabela de votos não encontrada."}`);
+      const msg = error?.message || "Tabela de votos não configurada no Supabase.";
+      alert(`Erro: ${msg}`);
     } finally {
       setVotingId(null);
     }
@@ -170,7 +167,7 @@ const PollsView: React.FC<PollsViewProps> = ({ user, polls, setPolls }) => {
       setNewTitle('');
       setNewDesc('');
     } catch (error: any) {
-      alert(`Erro ao criar pauta: ${error.message || "Verifique a estrutura das tabelas 'polls' e 'poll_options'."}`);
+      alert(`Erro ao criar: ${error.message || "Estrutura de tabelas ausente."}`);
     }
   };
 
@@ -204,7 +201,7 @@ const PollsView: React.FC<PollsViewProps> = ({ user, polls, setPolls }) => {
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/30 p-4 rounded-2xl flex items-start gap-4 text-amber-800 dark:text-amber-400 text-xs font-bold shadow-sm">
           <i className="fa-solid fa-triangle-exclamation text-xl mt-0.5"></i>
           <div>
-            <p className="uppercase tracking-wider">Aviso de Sincronização</p>
+            <p className="uppercase tracking-wider">Aviso de Sistema</p>
             <p className="font-medium opacity-80 mt-1">{errorInfo}</p>
           </div>
         </div>

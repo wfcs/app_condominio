@@ -25,9 +25,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, polls, announcements, tasks
       { label: 'Avisos no Mural', value: announcements.length, icon: 'fa-bullhorn', color: 'bg-brand-2 dark:bg-brand-3', tab: 'board' },
     ] : []),
     
-    // Portaria vê Visitantes Ativos
-    ...(isPortaria ? [
-      { label: 'Visitantes Ativos', value: activeVisitors, icon: 'fa-user-clock', color: 'bg-amber-500', tab: 'gatehouse' },
+    // Portaria/Staff autorizados vêem Visitantes Ativos no painel
+    ...(isStaff || user.role === UserRole.SINDICO ? [
+      { label: 'Visitantes Ativos', value: activeVisitors, icon: 'fa-user-clock', color: 'bg-amber-500', tab: 'visitors' },
     ] : []),
 
     { label: 'Chamados STAFF', value: tasks.filter(t => t.status !== 'Resolvido').length, icon: 'fa-screwdriver-wrench', color: 'bg-brand-3 dark:bg-brand-2', tab: 'operational' },
@@ -75,7 +75,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, polls, announcements, tasks
           <div className="p-6 border-b border-slate-50 dark:border-white/10 flex justify-between items-center bg-white dark:bg-transparent">
             <h3 className="font-bold text-brand-1 dark:text-white flex items-center gap-2">
               <i className={`fa-solid ${isStaff ? 'fa-list-check' : 'fa-newspaper'} text-brand-3`}></i>
-              {isStaff ? 'Tarefas e Ocorrências Recentes' : 'Comunicados Importantes'}
+              {isStaff ? 'Tarefas e Ocorrências Staff' : 'Comunicados Importantes'}
             </h3>
             {!isStaff && (
               <button 
@@ -129,7 +129,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, polls, announcements, tasks
               ))
             )}
             {((!isStaff && announcements.length === 0) || (isStaff && tasks.length === 0)) && (
-              <div className="p-10 text-center text-slate-400 italic text-sm">Nenhum registro recente.</div>
+              <div className="p-10 text-center text-slate-400 italic text-sm">Nenhum registro recente para seu perfil.</div>
             )}
           </div>
         </div>
@@ -138,44 +138,50 @@ const Dashboard: React.FC<DashboardProps> = ({ user, polls, announcements, tasks
           <div className="p-6 border-b border-slate-50 dark:border-white/10 bg-white dark:bg-transparent">
             <h3 className="font-bold text-brand-1 dark:text-white flex items-center gap-2">
               <i className="fa-solid fa-bolt text-brand-3"></i>
-              {isStaff ? 'Monitoramento' : 'Ações Imediatas'}
+              {isStaff ? 'Monitoramento Staff' : 'Ações Imediatas'}
             </h3>
           </div>
           <div className="p-6 space-y-4">
-            {user.role === UserRole.MORADOR ? (
-              polls.filter(p => p.active && !p.votedUnits.includes(user.unit)).length > 0 ? (
-                polls.filter(p => p.active && !p.votedUnits.includes(user.unit)).slice(0, 2).map(p => (
-                  <div key={p.id} className="bg-neutral-surface dark:bg-brand-2/10 p-5 rounded-2xl border border-brand-4 dark:border-brand-2/30">
-                    <h4 className="font-bold text-brand-1 dark:text-slate-200 text-sm">{p.title}</h4>
-                    <button 
-                      onClick={() => onNavigate('polls')}
-                      className="mt-4 w-full bg-brand-1 dark:bg-brand-3 text-white py-2.5 rounded-xl text-xs font-bold hover:bg-brand-2 transition-all shadow-md shadow-brand-1/10"
-                    >
-                      Votar Agora
-                    </button>
-                  </div>
-                ))
+            {!isStaff ? (
+              user.role === UserRole.MORADOR ? (
+                polls.filter(p => p.active && !p.votedUnits.includes(user.unit)).length > 0 ? (
+                  polls.filter(p => p.active && !p.votedUnits.includes(user.unit)).slice(0, 2).map(p => (
+                    <div key={p.id} className="bg-neutral-surface dark:bg-brand-2/10 p-5 rounded-2xl border border-brand-4 dark:border-brand-2/30">
+                      <h4 className="font-bold text-brand-1 dark:text-slate-200 text-sm">{p.title}</h4>
+                      <button 
+                        onClick={() => onNavigate('polls')}
+                        className="mt-4 w-full bg-brand-1 dark:bg-brand-3 text-white py-2.5 rounded-xl text-xs font-bold hover:bg-brand-2 transition-all shadow-md shadow-brand-1/10"
+                      >
+                        Votar Agora
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4 text-slate-400 text-xs">Sem votações pendentes.</div>
+                )
               ) : (
-                <div className="text-center py-4 text-slate-400 text-xs">Sem votações pendentes.</div>
+                 <div className="text-center py-4 text-slate-400 text-xs italic">Painel de controle administrativo ativo.</div>
               )
             ) : (
               /* Staff View para Monitoramento Lateral */
               <div className="space-y-4">
-                <div className="p-5 bg-amber-50 rounded-2xl border border-amber-100">
-                   <p className="text-[10px] font-black text-amber-600 uppercase mb-2 tracking-widest">Alerta Portaria</p>
-                   <p className="text-xs font-bold text-amber-800 leading-tight">Existem {activeVisitors} visitantes no condomínio há mais de 4 horas.</p>
-                   <button 
-                    onClick={() => onNavigate('gatehouse')}
-                    className="mt-3 text-[10px] font-black text-amber-700 uppercase underline"
-                   >
-                     Ver Lista de Checkout
-                   </button>
-                </div>
+                {isPortaria && (
+                  <div className="p-5 bg-amber-50 rounded-2xl border border-amber-100">
+                     <p className="text-[10px] font-black text-amber-600 uppercase mb-2 tracking-widest">Controle de Fluxo</p>
+                     <p className="text-xs font-bold text-amber-800 leading-tight">Existem {activeVisitors} visitantes sem check-out registrado.</p>
+                     <button 
+                      onClick={() => onNavigate('visitors')}
+                      className="mt-3 text-[10px] font-black text-amber-700 uppercase underline"
+                     >
+                       Ver Lista de Visitantes
+                     </button>
+                  </div>
+                )}
                 
                 {tasks.filter(t => t.priority === 'Crítica').length > 0 && (
                   <div className="p-5 bg-rose-50 rounded-2xl border border-rose-100">
                     <p className="text-[10px] font-black text-rose-600 uppercase mb-2 tracking-widest">Urgência Técnica</p>
-                    <p className="text-xs font-bold text-rose-800 leading-tight">Há chamados críticos aguardando início imediato.</p>
+                    <p className="text-xs font-bold text-rose-800 leading-tight">Há chamados críticos aguardando staff.</p>
                   </div>
                 )}
               </div>
@@ -184,7 +190,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, polls, announcements, tasks
               onClick={() => onNavigate(isStaff ? 'operational' : 'board')}
               className="w-full border-2 border-dashed border-slate-200 dark:border-white/10 text-slate-400 dark:text-brand-4 py-3 rounded-2xl text-xs font-bold hover:border-brand-3 hover:text-brand-3 transition-all"
             >
-              Ver {isStaff ? 'Painel Staff' : 'Histórico Completo'}
+              Ver {isStaff ? 'Quadro Operacional' : 'Histórico Completo'}
             </button>
           </div>
         </div>
