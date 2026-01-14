@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { User, UserRole, CondoClient, Notification, Poll, Announcement, OperationalTask } from './types';
 import { MOCK_USERS, MOCK_CLIENTS, MOCK_POLLS, MOCK_ANNOUNCEMENTS, MOCK_TASKS } from './constants';
 import Navbar from './components/Navbar';
@@ -22,18 +22,21 @@ const App: React.FC = () => {
   const [polls, setPolls] = useState<Poll[]>(MOCK_POLLS);
   const [announcements, setAnnouncements] = useState<Announcement[]>(MOCK_ANNOUNCEMENTS);
   const [tasks, setTasks] = useState<OperationalTask[]>(MOCK_TASKS);
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    return localStorage.getItem('condo_theme') === 'dark';
-  });
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('condo_theme') === 'dark');
 
   useEffect(() => {
     const savedUser = localStorage.getItem('condo_user');
     if (savedUser) {
-      setCurrentUser(JSON.parse(savedUser));
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+      } catch (e) {
+        localStorage.removeItem('condo_user');
+      }
     }
   }, []);
 
   useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode);
     localStorage.setItem('condo_theme', isDarkMode ? 'dark' : 'light');
   }, [isDarkMode]);
 
@@ -48,20 +51,23 @@ const App: React.FC = () => {
     setActiveTab('dashboard');
   };
 
-  const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-  };
-
   const isMasterAdmin = currentUser?.id === 'admin-fluxibi';
 
-  // Filtragem de Dados por Cliente (Isolamento RLS-like)
-  const filteredUsers = isMasterAdmin ? users : users.filter(u => u.clientId === currentUser?.clientId);
-  const filteredPolls = isMasterAdmin ? polls : polls.filter(p => p.clientId === currentUser?.clientId);
-  const filteredAnnouncements = isMasterAdmin ? announcements : announcements.filter(a => a.clientId === currentUser?.clientId);
-  const filteredTasks = isMasterAdmin ? tasks : tasks.filter(t => t.clientId === currentUser?.clientId);
-  const filteredNotifications = notifications.filter(n => 
-    (isMasterAdmin) || (n.clientId === currentUser?.clientId && (n.unitId === currentUser?.unit || currentUser?.role !== UserRole.MORADOR))
-  );
+  // Otimização: Evita re-filtrar arrays em cada renderização se os dados não mudaram
+  const filteredData = useMemo(() => {
+    if (!currentUser) return { users: [], polls: [], announcements: [], tasks: [], notifications: [] };
+    
+    const cid = currentUser.clientId;
+    return {
+      users: isMasterAdmin ? users : users.filter(u => u.clientId === cid),
+      polls: isMasterAdmin ? polls : polls.filter(p => p.clientId === cid),
+      announcements: isMasterAdmin ? announcements : announcements.filter(a => a.clientId === cid),
+      tasks: isMasterAdmin ? tasks : tasks.filter(t => t.clientId === cid),
+      notifications: notifications.filter(n => 
+        isMasterAdmin || (n.clientId === cid && (n.unitId === currentUser.unit || currentUser.role !== UserRole.MORADOR))
+      )
+    };
+  }, [currentUser, users, polls, announcements, tasks, notifications, isMasterAdmin]);
 
   const renderContent = () => {
     if (!currentUser) return null;
@@ -70,10 +76,10 @@ const App: React.FC = () => {
       case 'dashboard': 
         return <Dashboard 
           user={currentUser} 
-          polls={filteredPolls} 
-          announcements={filteredAnnouncements} 
-          tasks={filteredTasks} 
-          notifications={filteredNotifications} 
+          polls={filteredData.polls} 
+          announcements={filteredData.announcements} 
+          tasks={filteredData.tasks} 
+          notifications={filteredData.notifications} 
           onNavigate={setActiveTab} 
         />;
       case 'visitors':
@@ -81,18 +87,14 @@ const App: React.FC = () => {
       case 'gatehouse': 
         return <GatehouseView 
           user={currentUser} 
-          onSendNotification={(n) => setNotifications([{...n, clientId: currentUser.clientId}, ...notifications])} 
+          onSendNotification={(n) => setNotifications(prev => [n, ...prev])} 
         />;
       case 'polls': 
-        return <PollsView user={currentUser} polls={filteredPolls} setPolls={setPolls} />;
+        return <PollsView user={currentUser} polls={filteredData.polls} setPolls={setPolls} />;
       case 'board': 
-        if (![UserRole.MORADOR, UserRole.SINDICO].includes(currentUser.role)) {
-          setActiveTab('dashboard');
-          return null;
-        }
-        return <BoardView user={currentUser} announcements={filteredAnnouncements} setAnnouncements={setAnnouncements} />;
+        return <BoardView user={currentUser} announcements={filteredData.announcements} setAnnouncements={setAnnouncements} />;
       case 'operational': 
-        return <OperationalView user={currentUser} tasks={filteredTasks} setTasks={setTasks} />;
+        return <OperationalView user={currentUser} tasks={filteredData.tasks} setTasks={setTasks} />;
       case 'management': 
         return <ManagementView 
           users={users} 
@@ -106,7 +108,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`${isDarkMode ? 'dark' : ''}`}>
+    <div className={isDarkMode ? 'dark' : ''}>
       <div className="min-h-screen flex flex-col md:flex-row bg-neutral-surface dark:bg-brand-1 transition-colors duration-300">
         {!currentUser ? (
           <Login onLogin={handleLogin} users={users} />
@@ -117,8 +119,8 @@ const App: React.FC = () => {
               <Navbar 
                 user={currentUser} 
                 isDarkMode={isDarkMode}
-                toggleTheme={toggleTheme}
-                notifications={filteredNotifications} 
+                toggleTheme={() => setIsDarkMode(!isDarkMode)}
+                notifications={filteredData.notifications} 
               />
               <main className="flex-1 overflow-y-auto p-4 md:p-8">
                 <div className="max-w-6xl mx-auto">
